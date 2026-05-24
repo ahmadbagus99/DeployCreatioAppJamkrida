@@ -14,6 +14,13 @@ DEPLOY_DIR="/opt/creatio"
 # ─────────────────────────────────────────
 echo "📦 Checking dependencies..."
 
+# Install git kalau belum ada
+if ! command -v git &> /dev/null; then
+  echo "📦 Installing git..."
+  apt update -qq
+  apt install -y -qq git
+fi
+
 # Install python3-pip, unzip, rsync kalau belum ada
 apt update -qq
 apt install -y -qq python3-pip unzip rsync curl
