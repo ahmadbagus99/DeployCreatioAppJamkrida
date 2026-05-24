@@ -8,6 +8,7 @@ GDRIVE_FILE_ID="13Xy-wBdfUGb3woowL4RPlw6xtIYAmFek"
 ZIP_NAME="creatio.zip"
 EXTRACT_DIR="creatio-extracted"
 DEPLOY_DIR="/opt/creatio"
+REPO_DIR="$(cd "$(dirname "$0")" && pwd)"
 
 # ─────────────────────────────────────────
 # STEP 1 — Install dependencies
@@ -44,9 +45,9 @@ fi
 # ─────────────────────────────────────────
 # STEP 3 — Extract zip
 # ─────────────────────────────────────────
-if [ -f "${EXTRACT_DIR}/Terrasoft.WebHost.dll" ]; then
-  echo "📂 Already extracted, skipping."
-  INNER_DIR=${EXTRACT_DIR}
+if [ -f "${DEPLOY_DIR}/creatio-app/Terrasoft.WebHost.dll" ]; then
+  echo "📂 creatio-app already deployed, skipping extract."
+  INNER_DIR=""
 else
   echo "📂 Extracting zip..."
   rm -rf ${EXTRACT_DIR}
@@ -97,7 +98,7 @@ echo "✅ Cleanup done."
 # STEP 5 — Setup .env
 # ─────────────────────────────────────────
 if [ ! -f "${DEPLOY_DIR}/.env" ]; then
-  cp .env.example ${DEPLOY_DIR}/.env
+  cp ${REPO_DIR}/.env.example ${DEPLOY_DIR}/.env
   echo ""
   echo "⚠️  .env file created at ${DEPLOY_DIR}/.env"
   echo "   Please edit it now: nano ${DEPLOY_DIR}/.env"
@@ -113,7 +114,7 @@ while IFS= read -r line; do
     echo "$line" >> "${DEPLOY_DIR}/.env"
     echo "➕ Added missing variable: ${KEY}"
   fi
-done < .env.example
+done < ${REPO_DIR}/.env.example
 
 # ─────────────────────────────────────────
 # STEP 6 — Generate ConnectionStrings.config
