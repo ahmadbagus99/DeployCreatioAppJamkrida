@@ -105,10 +105,15 @@ if [ ! -f "${DEPLOY_DIR}/.env" ]; then
   exit 0
 fi
 
-# Load .env
-set -a
-source ${DEPLOY_DIR}/.env
-set +a
+# Tambahkan variable yang missing dari .env.example
+while IFS= read -r line; do
+  [[ "$line" =~ ^#.*$ || -z "$line" ]] && continue
+  KEY=$(echo "$line" | cut -d= -f1)
+  if ! grep -q "^${KEY}=" "${DEPLOY_DIR}/.env"; then
+    echo "$line" >> "${DEPLOY_DIR}/.env"
+    echo "➕ Added missing variable: ${KEY}"
+  fi
+done < .env.example
 
 # ─────────────────────────────────────────
 # STEP 6 — Generate ConnectionStrings.config
