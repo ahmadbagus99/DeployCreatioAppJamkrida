@@ -106,7 +106,9 @@ if [ ! -f "${DEPLOY_DIR}/.env" ]; then
 fi
 
 # Load .env
-export $(grep -v '^#' ${DEPLOY_DIR}/.env | xargs)
+set -a
+source ${DEPLOY_DIR}/.env
+set +a
 
 # ─────────────────────────────────────────
 # STEP 6 — Generate ConnectionStrings.config
