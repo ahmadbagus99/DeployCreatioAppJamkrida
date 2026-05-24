@@ -157,6 +157,36 @@ XMLEOF
 echo "✅ ConnectionStrings.config generated."
 
 # ─────────────────────────────────────────
+# STEP 6b — Update Terrasoft.WebHost.dll.config
+# ─────────────────────────────────────────
+echo "⚙️  Updating Terrasoft.WebHost.dll.config..."
+
+CONFIG_FILE="${DEPLOY_DIR}/creatio-app/Terrasoft.WebHost.dll.config"
+ENABLE_FILE_SYSTEM=$(grep '^ENABLE_FILE_SYSTEM=' ${DEPLOY_DIR}/.env | cut -d= -f2)
+COOKIES_SAME_SITE_MODE=$(grep '^COOKIES_SAME_SITE_MODE=' ${DEPLOY_DIR}/.env | cut -d= -f2)
+
+if [ -f "$CONFIG_FILE" ]; then
+  if [ "$ENABLE_FILE_SYSTEM" = "true" ]; then
+    sed -i 's/<fileDesignMode enabled="false"\/>/<fileDesignMode enabled="true"\/>/' "$CONFIG_FILE"
+    sed -i 's/key="UseStaticFileContent" value="true"/key="UseStaticFileContent" value="false"/' "$CONFIG_FILE"
+    echo "   ✅ FileSystem mode enabled."
+  else
+    sed -i 's/<fileDesignMode enabled="true"\/>/<fileDesignMode enabled="false"\/>/' "$CONFIG_FILE"
+    sed -i 's/key="UseStaticFileContent" value="false"/key="UseStaticFileContent" value="true"/' "$CONFIG_FILE"
+    echo "   ✅ FileSystem mode disabled."
+  fi
+
+  if [ -n "$COOKIES_SAME_SITE_MODE" ]; then
+    sed -i "s/key=\"CookiesSameSiteMode\" value=\"[^\"]*\"/key=\"CookiesSameSiteMode\" value=\"${COOKIES_SAME_SITE_MODE}\"/" "$CONFIG_FILE"
+    echo "   ✅ CookiesSameSiteMode set to ${COOKIES_SAME_SITE_MODE}."
+  fi
+
+  echo "✅ Terrasoft.WebHost.dll.config updated."
+else
+  echo "⚠️  Terrasoft.WebHost.dll.config not found, skipping."
+fi
+
+# ─────────────────────────────────────────
 # STEP 7 — Docker compose up
 # ─────────────────────────────────────────
 echo "🐳 Starting containers..."
