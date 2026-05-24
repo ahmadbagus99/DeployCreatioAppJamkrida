@@ -1,0 +1,5 @@
+.env
+*.zip
+creatio-extracted/
+creatio-app/
+db-backup/creatio.backup
