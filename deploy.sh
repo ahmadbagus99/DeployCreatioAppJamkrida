@@ -14,7 +14,10 @@ DEPLOY_DIR="/opt/creatio"
 # ─────────────────────────────────────────
 echo "📦 Checking dependencies..."
 
-# Install python3-pip, unzip, rsync kalau belum ada
+# Hapus Jenkins repo kalau ada (biar apt update ga error)
+rm -f /etc/apt/sources.list.d/jenkins.list
+rm -f /etc/apt/sources.list.d/jenkins.list.save
+
 apt update -qq
 apt install -y -qq python3-pip unzip rsync curl
 
@@ -44,38 +47,47 @@ fi
 # ─────────────────────────────────────────
 # STEP 3 — Extract zip
 # ─────────────────────────────────────────
-echo "📂 Extracting zip..."
-rm -rf ${EXTRACT_DIR}
-unzip -q ${ZIP_NAME} -d ${EXTRACT_DIR}
-
-# Cek apakah file langsung di root atau ada subfolder
 if [ -f "${EXTRACT_DIR}/Terrasoft.WebHost.dll" ]; then
+  echo "📂 Already extracted, skipping."
   INNER_DIR=${EXTRACT_DIR}
 else
-  INNER_DIR=$(find ${EXTRACT_DIR} -name "Terrasoft.WebHost.dll" -maxdepth 3 | xargs dirname | head -1)
+  echo "📂 Extracting zip..."
+  rm -rf ${EXTRACT_DIR}
+  unzip -q ${ZIP_NAME} -d ${EXTRACT_DIR}
+
+  if [ -f "${EXTRACT_DIR}/Terrasoft.WebHost.dll" ]; then
+    INNER_DIR=${EXTRACT_DIR}
+  else
+    INNER_DIR=$(find ${EXTRACT_DIR} -name "Terrasoft.WebHost.dll" -maxdepth 3 | xargs dirname | head -1)
+  fi
 fi
 echo "📁 App root: ${INNER_DIR}"
 
 # ─────────────────────────────────────────
 # STEP 4 — Siapkan folder deploy
 # ─────────────────────────────────────────
-echo "🔧 Preparing deploy directory..."
-mkdir -p ${DEPLOY_DIR}/creatio-app
-mkdir -p ${DEPLOY_DIR}/db-backup
-
-# Copy creatio-app (exclude folder db)
-rsync -a --exclude='/db/' ${INNER_DIR}/ ${DEPLOY_DIR}/creatio-app/
-
-# Copy DB backup dari folder db/
-DB_FILE=$(find ${INNER_DIR}/db -type f | head -1)
-if [ -n "$DB_FILE" ]; then
-  echo "🗄️  Found DB file: $DB_FILE"
-  cp "$DB_FILE" ${DEPLOY_DIR}/db-backup/creatio.backup
+if [ -f "${DEPLOY_DIR}/creatio-app/Terrasoft.WebHost.dll" ]; then
+  echo "🔧 creatio-app already exists, skipping copy."
 else
-  echo "⚠️  No DB file found in /db folder!"
+  echo "🔧 Copying creatio-app to deploy directory..."
+  mkdir -p ${DEPLOY_DIR}/creatio-app
+  rsync -a --exclude='/db/' ${INNER_DIR}/ ${DEPLOY_DIR}/creatio-app/
 fi
 
-# Copy docker files
+if [ -f "${DEPLOY_DIR}/db-backup/creatio.backup" ]; then
+  echo "🗄️  DB backup already exists, skipping copy."
+else
+  mkdir -p ${DEPLOY_DIR}/db-backup
+  DB_FILE=$(find ${INNER_DIR}/db -type f | head -1)
+  if [ -n "$DB_FILE" ]; then
+    echo "🗄️  Found DB file: $DB_FILE"
+    cp "$DB_FILE" ${DEPLOY_DIR}/db-backup/creatio.backup
+  else
+    echo "⚠️  No DB file found in /db folder!"
+  fi
+fi
+
+# Copy docker files (selalu update)
 cp docker-compose.yaml ${DEPLOY_DIR}/
 cp Dockerfile ${DEPLOY_DIR}/
 cp db-backup/restore.sh ${DEPLOY_DIR}/db-backup/restore.sh
@@ -132,5 +144,5 @@ docker compose up -d --build
 
 echo ""
 echo "✅ Deploy complete!"
-echo "   Creatio : http://$(curl -s ifconfig.me):${CREATIO_PORT}"
-echo "   pgAdmin : http://$(curl -s ifconfig.me):${PGADMIN_PORT}"
+echo "   Creatio : http://$(curl -s -4 ifconfig.me):${CREATIO_PORT}"
+echo "   pgAdmin : http://$(curl -s -4 ifconfig.me):${PGADMIN_PORT}"
