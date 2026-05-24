@@ -93,6 +93,12 @@ cp Dockerfile ${DEPLOY_DIR}/
 cp db-backup/restore.sh ${DEPLOY_DIR}/db-backup/restore.sh
 chmod +x ${DEPLOY_DIR}/db-backup/restore.sh
 
+# Cleanup extract folder dan Docker cache untuk hemat space
+echo "🧹 Cleaning up to free disk space..."
+rm -rf ${EXTRACT_DIR}
+docker system prune -af --volumes 2>/dev/null || true
+echo "✅ Cleanup done."
+
 # ─────────────────────────────────────────
 # STEP 5 — Setup .env
 # ─────────────────────────────────────────
