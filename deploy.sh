@@ -24,8 +24,11 @@ if ! command -v gdown &> /dev/null; then
 fi
 
 if ! command -v docker &> /dev/null; then
-  echo "❌ Docker not found. Please install Docker first."
-  exit 1
+  echo "🐳 Docker not found. Installing Docker..."
+  curl -fsSL https://get.docker.com | sh
+  systemctl enable docker
+  systemctl start docker
+  echo "✅ Docker installed."
 fi
 
 # ─────────────────────────────────────────
