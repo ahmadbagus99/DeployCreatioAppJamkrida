@@ -13,10 +13,16 @@ DEPLOY_DIR="/opt/creatio"
 # STEP 1 — Install dependencies
 # ─────────────────────────────────────────
 echo "📦 Checking dependencies..."
+
+# Install python3-pip, unzip, rsync kalau belum ada
+apt update -qq
+apt install -y -qq python3-pip unzip rsync curl
+
 if ! command -v gdown &> /dev/null; then
   echo "Installing gdown..."
   pip3 install gdown --break-system-packages -q
 fi
+
 if ! command -v docker &> /dev/null; then
   echo "❌ Docker not found. Please install Docker first."
   exit 1
