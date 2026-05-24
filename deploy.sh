@@ -115,6 +115,15 @@ set +a
 # ─────────────────────────────────────────
 echo "⚙️  Generating ConnectionStrings.config from .env..."
 
+POSTGRES_HOST=$(grep '^POSTGRES_HOST=' ${DEPLOY_DIR}/.env | cut -d= -f2)
+POSTGRES_DB=$(grep '^POSTGRES_DB=' ${DEPLOY_DIR}/.env | cut -d= -f2)
+POSTGRES_USER=$(grep '^POSTGRES_USER=' ${DEPLOY_DIR}/.env | cut -d= -f2)
+POSTGRES_PASSWORD=$(grep '^POSTGRES_PASSWORD=' ${DEPLOY_DIR}/.env | cut -d= -f2-)
+REDIS_HOST=$(grep '^REDIS_HOST=' ${DEPLOY_DIR}/.env | cut -d= -f2)
+REDIS_PASSWORD=$(grep '^REDIS_PASSWORD=' ${DEPLOY_DIR}/.env | cut -d= -f2-)
+CREATIO_PORT=$(grep '^CREATIO_PORT=' ${DEPLOY_DIR}/.env | cut -d= -f2)
+PGADMIN_PORT=$(grep '^PGADMIN_PORT=' ${DEPLOY_DIR}/.env | cut -d= -f2)
+
 cat > ${DEPLOY_DIR}/creatio-app/ConnectionStrings.config << XMLEOF
 <?xml version="1.0" encoding="utf-8"?>
 <connectionStrings>
