@@ -19,7 +19,7 @@ DeployCreatioAppJamkrida/
 
 ```bash
 # 1. Clone repo
-git clone https://github.com/ahmadbagus99/DeployCreatioAppJamkrida.git
+git clone https://github.com/ahmadbagus99/DeployCreatioApp.git
 cd DeployCreatioAppJamkrida
 
 # 2. Jalankan deploy script
