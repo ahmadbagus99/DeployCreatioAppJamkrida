@@ -100,9 +100,19 @@ echo "✅ Cleanup done."
 if [ ! -f "${DEPLOY_DIR}/.env" ]; then
   cp ${REPO_DIR}/.env.example ${DEPLOY_DIR}/.env
   echo ""
-  echo "⚠️  .env file created at ${DEPLOY_DIR}/.env"
-  echo "   Please edit it now: nano ${DEPLOY_DIR}/.env"
-  echo "   Then re-run: ./deploy.sh"
+  echo "╔══════════════════════════════════════════════════╗"
+  echo "║           ⚠️  SETUP REQUIRED                     ║"
+  echo "╠══════════════════════════════════════════════════╣"
+  echo "║  .env file created at:                           ║"
+  echo "║  /opt/creatio/.env                               ║"
+  echo "║                                                  ║"
+  echo "║  1. Edit .env:                                   ║"
+  echo "║     nano /opt/creatio/.env                       ║"
+  echo "║                                                  ║"
+  echo "║  2. Re-run deploy:                               ║"
+  echo "║     ./deploy.sh                                  ║"
+  echo "╚══════════════════════════════════════════════════╝"
+  echo ""
   exit 0
 fi
 
