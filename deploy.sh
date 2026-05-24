@@ -34,8 +34,12 @@ fi
 # ─────────────────────────────────────────
 # STEP 2 — Download zip dari Google Drive
 # ─────────────────────────────────────────
-echo "⬇️  Downloading Creatio zip from Google Drive..."
-gdown "https://drive.google.com/uc?id=${GDRIVE_FILE_ID}" -O ${ZIP_NAME}
+if [ -f "${ZIP_NAME}" ]; then
+  echo "⬇️  Zip already exists, skipping download."
+else
+  echo "⬇️  Downloading Creatio zip from Google Drive..."
+  gdown "https://drive.google.com/uc?id=${GDRIVE_FILE_ID}" -O ${ZIP_NAME}
+fi
 
 # ─────────────────────────────────────────
 # STEP 3 — Extract zip
@@ -44,11 +48,13 @@ echo "📂 Extracting zip..."
 rm -rf ${EXTRACT_DIR}
 unzip -q ${ZIP_NAME} -d ${EXTRACT_DIR}
 
-INNER_DIR=$(find ${EXTRACT_DIR} -maxdepth 1 -mindepth 1 -type d | head -1)
-if [ -z "$INNER_DIR" ]; then
+# Cek apakah file langsung di root atau ada subfolder
+if [ -f "${EXTRACT_DIR}/Terrasoft.WebHost.dll" ]; then
   INNER_DIR=${EXTRACT_DIR}
+else
+  INNER_DIR=$(find ${EXTRACT_DIR} -name "Terrasoft.WebHost.dll" -maxdepth 3 | xargs dirname | head -1)
 fi
-echo "📁 Extracted to: ${INNER_DIR}"
+echo "📁 App root: ${INNER_DIR}"
 
 # ─────────────────────────────────────────
 # STEP 4 — Siapkan folder deploy
