@@ -1,11 +1,11 @@
-# DeployCreatioAppJamkrida
+# DeployCreatioApp
 
 Auto deploy Creatio dari Google Drive ke server.
 
 ## Struktur Repo
 
 ```
-DeployCreatioAppJamkrida/
+DeployCreatioApp/
 ├── Dockerfile
 ├── docker-compose.yaml
 ├── deploy.sh           
@@ -20,7 +20,7 @@ DeployCreatioAppJamkrida/
 ```bash
 # 1. Clone repo
 git clone https://github.com/ahmadbagus99/DeployCreatioApp.git
-cd DeployCreatioAppJamkrida
+cd DeployCreatioApp
 
 # 2. Jalankan deploy script
 chmod +x deploy.sh
