@@ -13,11 +13,8 @@ DEPLOY_DIR="/opt/creatio"
 # STEP 1 — Install dependencies
 # ─────────────────────────────────────────
 echo "📦 Checking dependencies..."
-
-# Hapus Jenkins repo kalau ada (biar apt update ga error)
 rm -f /etc/apt/sources.list.d/jenkins.list
 rm -f /etc/apt/sources.list.d/jenkins.list.save
-
 apt update -qq
 apt install -y -qq python3-pip unzip rsync curl
 
@@ -54,7 +51,6 @@ else
   echo "📂 Extracting zip..."
   rm -rf ${EXTRACT_DIR}
   unzip -q ${ZIP_NAME} -d ${EXTRACT_DIR}
-
   if [ -f "${EXTRACT_DIR}/Terrasoft.WebHost.dll" ]; then
     INNER_DIR=${EXTRACT_DIR}
   else
@@ -87,13 +83,11 @@ else
   fi
 fi
 
-# Copy docker files (selalu update)
 cp docker-compose.yaml ${DEPLOY_DIR}/
 cp Dockerfile ${DEPLOY_DIR}/
 cp db-backup/restore.sh ${DEPLOY_DIR}/db-backup/restore.sh
 chmod +x ${DEPLOY_DIR}/db-backup/restore.sh
 
-# Cleanup extract folder dan Docker cache untuk hemat space
 echo "🧹 Cleaning up to free disk space..."
 rm -rf ${EXTRACT_DIR}
 docker system prune -af --volumes 2>/dev/null || true
@@ -155,6 +149,15 @@ cat > ${DEPLOY_DIR}/creatio-app/ConnectionStrings.config << XMLEOF
 XMLEOF
 
 echo "✅ ConnectionStrings.config generated."
+
+# ─────────────────────────────────────────
+# STEP 6b — Update Terrasoft.WebHost.dll.config
+# ─────────────────────────────────────────
+echo "⚙️  Updating Terrasoft.WebHost.dll.config..."
+
+CONFIG_FILE="${DEPLOY_DIR}/creatio-app/Terrasoft.WebHost.dll.config"
+ENABLE_FILE_SYSTEM=$(grep '^ENABLE_FILE_SYSTEM=' ${DEPLOY_DIR}/.env | cut -d= -f2)
+COOKIES_SAME_SITE_MODE=$(grep '^COOKIES_SAME_SITE_MODE=' ${DEPLOY_DIR}/.env | cut -d= -f2)
 
 if [ -f "$CONFIG_FILE" ]; then
   if [ "$ENABLE_FILE_SYSTEM" = "true" ]; then
