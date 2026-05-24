@@ -8,7 +8,7 @@ Auto deploy Creatio dari Google Drive ke server.
 DeployCreatioAppJamkrida/
 ├── Dockerfile
 ├── docker-compose.yaml
-├── deploy.sh           ← script utama
+├── deploy.sh           
 ├── .env.example
 ├── .gitignore
 └── db-backup/
