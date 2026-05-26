@@ -4,10 +4,10 @@ set -e
 # ─────────────────────────────────────────
 # CONFIG
 # ─────────────────────────────────────────
-GDRIVE_FILE_ID="13Xy-wBdfUGb3woowL4RPlw6xtIYAmFek"
+GDRIVE_FILE_ID="1qKkJs1Gk5jNPxuXBVlHh-C8rpl0Lz3X2"
 ZIP_NAME="creatio.zip"
 EXTRACT_DIR="creatio-extracted"
-DEPLOY_DIR="$HOME/Downloads/CreatioJamkrida"
+DEPLOY_DIR="$HOME/CreatioApp"
 REPO_DIR="$(cd "$(dirname "$0")" && pwd)"
 
 # ─────────────────────────────────────────
