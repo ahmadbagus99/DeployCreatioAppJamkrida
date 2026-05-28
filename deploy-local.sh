@@ -2,12 +2,24 @@
 set -e
 
 # ─────────────────────────────────────────
-# CONFIG
+# USAGE: ./deploy-mac.sh <instance_name>
+# Example: ./deploy-mac.sh jamkrida
 # ─────────────────────────────────────────
+
+if [ -z "$1" ]; then
+  echo "❌ Instance name required!"
+  echo "   Usage: ./deploy-mac.sh <instance_name>"
+  echo "   Example: ./deploy-mac.sh jamkrida"
+  exit 1
+fi
+
+INSTANCE=$1
 GDRIVE_FILE_ID="1qKkJs1Gk5jNPxuXBVlHh-C8rpl0Lz3X2"
 ZIP_NAME="creatio.zip"
 EXTRACT_DIR="creatio-extracted"
-DEPLOY_DIR="$HOME/CreatioApp"
+BASE_DIR="$HOME/CreatioApp"
+DEPLOY_DIR="${BASE_DIR}/${INSTANCE}"
+SHARED_DIR="${BASE_DIR}/shared"
 REPO_DIR="$(cd "$(dirname "$0")" && pwd)"
 
 # ─────────────────────────────────────────
@@ -67,12 +79,13 @@ fi
 # ─────────────────────────────────────────
 # STEP 4 — Siapkan folder deploy
 # ─────────────────────────────────────────
+mkdir -p ${DEPLOY_DIR}/creatio-app
+mkdir -p ${DEPLOY_DIR}/db-backup
+
 if [ -n "$INNER_DIR" ]; then
   echo "🔧 Copying creatio-app to deploy directory..."
-  mkdir -p ${DEPLOY_DIR}/creatio-app
   rsync -a --exclude='/db/' ${INNER_DIR}/ ${DEPLOY_DIR}/creatio-app/
 
-  mkdir -p ${DEPLOY_DIR}/db-backup
   DB_FILE=$(find ${INNER_DIR}/db -type f | head -1)
   if [ -n "$DB_FILE" ]; then
     echo "🗄️  Found DB file: $DB_FILE"
@@ -85,10 +98,7 @@ else
   echo "🗄️  DB backup already exists, skipping copy."
 fi
 
-# Copy docker files
-cp docker-compose.yaml ${DEPLOY_DIR}/
-cp Dockerfile ${DEPLOY_DIR}/
-cp db-backup/restore.sh ${DEPLOY_DIR}/db-backup/restore.sh
+cp ${REPO_DIR}/db-backup/restore.sh ${DEPLOY_DIR}/db-backup/restore.sh
 chmod +x ${DEPLOY_DIR}/db-backup/restore.sh
 
 echo "🧹 Cleaning up extract folder..."
@@ -98,20 +108,41 @@ echo "✅ Cleanup done."
 # ─────────────────────────────────────────
 # STEP 5 — Setup .env
 # ─────────────────────────────────────────
-if [ ! -f "${DEPLOY_DIR}/.env" ]; then
-  cp ${REPO_DIR}/.env.example ${DEPLOY_DIR}/.env
+ENV_FILE="${DEPLOY_DIR}/.env"
+
+# Auto assign port
+BASE_PORT=8080
+USED_PORTS=$(docker ps --format "{{.Ports}}" | grep -oE '0\.0\.0\.0:[0-9]+' | grep -oE '[0-9]+$' | sort -n)
+
+find_free_port() {
+  local port=$1
+  while echo "$USED_PORTS" | grep -q "^${port}$"; do
+    port=$((port + 1))
+  done
+  echo $port
+}
+
+CREATIO_PORT=$(find_free_port $BASE_PORT)
+CREATIO_HTTPS_PORT=$(find_free_port $((CREATIO_PORT + 363)))
+
+if [ ! -f "$ENV_FILE" ]; then
+  cp ${REPO_DIR}/.env.example ${ENV_FILE}
+  sed -i '' "s/^POSTGRES_DB=.*/POSTGRES_DB=creatio_${INSTANCE}/" "$ENV_FILE"
+  sed -i '' "s/^CREATIO_PORT=.*/CREATIO_PORT=${CREATIO_PORT}/" "$ENV_FILE"
+  sed -i '' "s/^CREATIO_HTTPS_PORT=.*/CREATIO_HTTPS_PORT=${CREATIO_HTTPS_PORT}/" "$ENV_FILE"
+
   echo ""
   echo "╔══════════════════════════════════════════════════╗"
   echo "║           ⚠️  SETUP REQUIRED                     ║"
   echo "╠══════════════════════════════════════════════════╣"
-  echo "║  .env file created at:                           ║"
-  echo "║  ${DEPLOY_DIR}/.env"
+  echo "║  Instance : ${INSTANCE}"
+  echo "║  .env     : ${ENV_FILE}"
   echo "║                                                  ║"
-  echo "║  1. Edit .env:                                   ║"
-  echo "║     nano ${DEPLOY_DIR}/.env"
+  echo "║  1. Edit .env jika perlu:                        ║"
+  echo "║     nano ${ENV_FILE}"
   echo "║                                                  ║"
   echo "║  2. Re-run deploy:                               ║"
-  echo "║     ./deploy-mac.sh                              ║"
+  echo "║     ./deploy-mac.sh ${INSTANCE}"
   echo "╚══════════════════════════════════════════════════╝"
   echo ""
   exit 0
@@ -121,32 +152,155 @@ fi
 while IFS= read -r line; do
   [[ "$line" =~ ^#.*$ || -z "$line" ]] && continue
   KEY=$(echo "$line" | cut -d= -f1)
-  if ! grep -q "^${KEY}=" "${DEPLOY_DIR}/.env"; then
-    echo "$line" >> "${DEPLOY_DIR}/.env"
+  if ! grep -q "^${KEY}=" "$ENV_FILE"; then
+    echo "$line" >> "$ENV_FILE"
     echo "➕ Added missing variable: ${KEY}"
   fi
 done < ${REPO_DIR}/.env.example
 
+# Load nilai dari .env
+POSTGRES_HOST=$(grep '^POSTGRES_HOST=' $ENV_FILE | cut -d= -f2)
+POSTGRES_DB=$(grep '^POSTGRES_DB=' $ENV_FILE | cut -d= -f2)
+POSTGRES_USER=$(grep '^POSTGRES_USER=' $ENV_FILE | cut -d= -f2)
+POSTGRES_PASSWORD=$(grep '^POSTGRES_PASSWORD=' $ENV_FILE | cut -d= -f2-)
+REDIS_HOST=$(grep '^REDIS_HOST=' $ENV_FILE | cut -d= -f2)
+REDIS_PASSWORD=$(grep '^REDIS_PASSWORD=' $ENV_FILE | cut -d= -f2-)
+CREATIO_PORT=$(grep '^CREATIO_PORT=' $ENV_FILE | cut -d= -f2)
+CREATIO_HTTPS_PORT=$(grep '^CREATIO_HTTPS_PORT=' $ENV_FILE | cut -d= -f2)
+PGADMIN_PORT=$(grep '^PGADMIN_PORT=' $ENV_FILE | cut -d= -f2)
+ENABLE_FILE_SYSTEM=$(grep '^ENABLE_FILE_SYSTEM=' $ENV_FILE | cut -d= -f2)
+COOKIES_SAME_SITE_MODE=$(grep '^COOKIES_SAME_SITE_MODE=' $ENV_FILE | cut -d= -f2)
+
 # ─────────────────────────────────────────
-# STEP 6 — Generate ConnectionStrings.config
+# STEP 6 — Pastikan shared services jalan
+# ─────────────────────────────────────────
+echo "🔍 Checking shared services (postgres, redis, pgadmin)..."
+mkdir -p ${SHARED_DIR}
+
+SHARED_COMPOSE="${SHARED_DIR}/docker-compose.yaml"
+
+if [ ! -f "$SHARED_COMPOSE" ]; then
+cat > "$SHARED_COMPOSE" << YAML
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: creatio-postgres
+    restart: unless-stopped
+    command: postgres -c max_connections=500 -c shared_buffers=256MB
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: postgres
+    ports:
+      - "5433:5432"
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    networks:
+      - creatio-shared
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER}"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  redis:
+    image: redis:7-alpine
+    container_name: creatio-redis
+    restart: unless-stopped
+    command: redis-server --bind 0.0.0.0 --requirepass ${REDIS_PASSWORD}
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis-data:/data
+    networks:
+      - creatio-shared
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+
+  pgadmin:
+    image: dpage/pgadmin4:latest
+    container_name: creatio-pgadmin
+    restart: unless-stopped
+    environment:
+      PGADMIN_DEFAULT_EMAIL: ${PGADMIN_EMAIL}
+      PGADMIN_DEFAULT_PASSWORD: ${PGADMIN_PASSWORD}
+    ports:
+      - "${PGADMIN_PORT}:80"
+    networks:
+      - creatio-shared
+
+networks:
+  creatio-shared:
+    driver: bridge
+
+volumes:
+  postgres-data:
+  redis-data:
+YAML
+fi
+
+if ! docker ps | grep -q "creatio-postgres"; then
+  echo "🐳 Starting shared services..."
+  docker compose -f "$SHARED_COMPOSE" up -d
+  echo "⏳ Waiting for postgres to be ready..."
+  sleep 15
+else
+  echo "✅ Shared services already running."
+fi
+
+# Buat DB dan restore kalau belum ada
+POSTGRES_MAINTENANCE_DB=$(grep '^POSTGRES_MAINTENANCE_DB=' $ENV_FILE | cut -d= -f2)
+
+DB_EXISTS=$(docker exec creatio-postgres psql -U ${POSTGRES_USER} -d ${POSTGRES_MAINTENANCE_DB} -tAc "SELECT 1 FROM pg_database WHERE datname='${POSTGRES_DB}'" 2>/dev/null || echo "")
+
+if [ "$DB_EXISTS" != "1" ]; then
+  echo "🗄️  Creating database ${POSTGRES_DB}..."
+  docker exec creatio-postgres psql -U ${POSTGRES_USER} -d ${POSTGRES_MAINTENANCE_DB} -c "CREATE DATABASE ${POSTGRES_DB};"
+
+  if [ -f "${DEPLOY_DIR}/db-backup/creatio.backup" ]; then
+    echo "🔄 Restoring database..."
+    docker exec -i creatio-postgres pg_restore \
+      -U ${POSTGRES_USER} \
+      -d ${POSTGRES_DB} \
+      --no-password \
+      -v \
+      < ${DEPLOY_DIR}/db-backup/creatio.backup 2>/dev/null || true
+    echo "✅ Database restored."
+  fi
+else
+  echo "✅ Database ${POSTGRES_DB} already exists."
+fi
+
+# Auto assign Redis db number
+REDIS_DB=0
+for dir in ${BASE_DIR}/*/; do
+  if [ -f "${dir}.env" ] && [ "${dir}" != "${DEPLOY_DIR}/" ]; then
+    USED_REDIS_DB=$(grep '^REDIS_DB=' "${dir}.env" 2>/dev/null | cut -d= -f2)
+    if [ -n "$USED_REDIS_DB" ] && [ "$USED_REDIS_DB" = "$REDIS_DB" ]; then
+      REDIS_DB=$((REDIS_DB + 1))
+    fi
+  fi
+done
+
+if ! grep -q "^REDIS_DB=" "$ENV_FILE"; then
+  echo "REDIS_DB=${REDIS_DB}" >> "$ENV_FILE"
+fi
+REDIS_DB=$(grep '^REDIS_DB=' $ENV_FILE | cut -d= -f2)
+
+# ─────────────────────────────────────────
+# STEP 7 — Generate ConnectionStrings.config
 # ─────────────────────────────────────────
 echo "⚙️  Generating ConnectionStrings.config from .env..."
-
-POSTGRES_HOST=$(grep '^POSTGRES_HOST=' ${DEPLOY_DIR}/.env | cut -d= -f2)
-POSTGRES_DB=$(grep '^POSTGRES_DB=' ${DEPLOY_DIR}/.env | cut -d= -f2)
-POSTGRES_USER=$(grep '^POSTGRES_USER=' ${DEPLOY_DIR}/.env | cut -d= -f2)
-POSTGRES_PASSWORD=$(grep '^POSTGRES_PASSWORD=' ${DEPLOY_DIR}/.env | cut -d= -f2-)
-REDIS_HOST=$(grep '^REDIS_HOST=' ${DEPLOY_DIR}/.env | cut -d= -f2)
-REDIS_PASSWORD=$(grep '^REDIS_PASSWORD=' ${DEPLOY_DIR}/.env | cut -d= -f2-)
-CREATIO_PORT=$(grep '^CREATIO_PORT=' ${DEPLOY_DIR}/.env | cut -d= -f2)
-PGADMIN_PORT=$(grep '^PGADMIN_PORT=' ${DEPLOY_DIR}/.env | cut -d= -f2)
 
 cat > ${DEPLOY_DIR}/creatio-app/ConnectionStrings.config << XMLEOF
 <?xml version="1.0" encoding="utf-8"?>
 <connectionStrings>
   <add name="db" connectionString="Server=${POSTGRES_HOST};Port=5432;Database=${POSTGRES_DB};User ID=${POSTGRES_USER};password=${POSTGRES_PASSWORD};Timeout=500; CommandTimeout=400;MaxPoolSize=1024;" />
   <add name="dbPostgreSql" connectionString="Pooling=true; Database=${POSTGRES_DB}; Host=${POSTGRES_HOST}; Port=5432; Username=${POSTGRES_USER}; Password=${POSTGRES_PASSWORD}; Timeout=5; CommandTimeout=400" />
-  <add name="redis" connectionString="host=${REDIS_HOST};db=0;port=6379;password=${REDIS_PASSWORD}" />
+  <add name="redis" connectionString="host=${REDIS_HOST};db=${REDIS_DB};port=6379;password=${REDIS_PASSWORD}" />
   <add name="dbMssqlCore" connectionString="Data Source=tscore-ms-01\mssql2008; Initial Catalog=BPMonlineCore; Persist Security Info=True; MultipleActiveResultSets=True; Integrated Security=SSPI; Pooling = true; Max Pool Size = 100; Async = true" />
   <add name="dbMssqlUnitTest" connectionString="Data Source=TSAppHost-02; Initial Catalog=BPMonlineUnitTest; Persist Security Info=True; MultipleActiveResultSets=True; User ID=UnitTest; Password=UnitTest; Async = true" />
   <add name="tempDirectoryPath" connectionString="%TEMP%/%USER%/%APPLICATION%" />
@@ -163,13 +317,11 @@ XMLEOF
 echo "✅ ConnectionStrings.config generated."
 
 # ─────────────────────────────────────────
-# STEP 6b — Update Terrasoft.WebHost.dll.config
+# STEP 8 — Update Terrasoft.WebHost.dll.config
 # ─────────────────────────────────────────
 echo "⚙️  Updating Terrasoft.WebHost.dll.config..."
 
 CONFIG_FILE="${DEPLOY_DIR}/creatio-app/Terrasoft.WebHost.dll.config"
-ENABLE_FILE_SYSTEM=$(grep '^ENABLE_FILE_SYSTEM=' ${DEPLOY_DIR}/.env | cut -d= -f2)
-COOKIES_SAME_SITE_MODE=$(grep '^COOKIES_SAME_SITE_MODE=' ${DEPLOY_DIR}/.env | cut -d= -f2)
 
 if [ -f "$CONFIG_FILE" ]; then
   if [ "$ENABLE_FILE_SYSTEM" = "true" ]; then
@@ -186,21 +338,65 @@ if [ -f "$CONFIG_FILE" ]; then
     sed -i '' "s/key=\"CookiesSameSiteMode\" value=\"[^\"]*\" \//key=\"CookiesSameSiteMode\" value=\"${COOKIES_SAME_SITE_MODE}\" \//g" "$CONFIG_FILE"
     echo "   ✅ CookiesSameSiteMode set to ${COOKIES_SAME_SITE_MODE}."
   fi
-
   echo "✅ Terrasoft.WebHost.dll.config updated."
 else
   echo "⚠️  Terrasoft.WebHost.dll.config not found, skipping."
 fi
 
 # ─────────────────────────────────────────
-# STEP 7 — Docker compose up
+# STEP 9 — Buat docker-compose per instance
 # ─────────────────────────────────────────
-echo "🐳 Starting containers..."
+echo "🐳 Preparing docker-compose for instance ${INSTANCE}..."
+
+cp ${REPO_DIR}/Dockerfile ${DEPLOY_DIR}/
+
+cat > ${DEPLOY_DIR}/docker-compose.yaml << YAML
+services:
+  creatio:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        NetCoreVersion: "8.0"
+    container_name: creatio-${INSTANCE}
+    restart: unless-stopped
+    ports:
+      - "${CREATIO_PORT}:5000"
+      - "${CREATIO_HTTPS_PORT}:5002"
+    volumes:
+      - ./creatio-app:/app
+      - creatio-${INSTANCE}-logs:/app/Logs
+    networks:
+      - creatio-shared
+    environment:
+      - ASPNETCORE_ENVIRONMENT=Development
+      - DOTNET_RUNNING_IN_CONTAINER=true
+      - TZ=Asia/Jakarta
+
+volumes:
+  creatio-${INSTANCE}-logs:
+
+networks:
+  creatio-shared:
+    external: true
+    name: shared_creatio-shared
+YAML
+
+# ─────────────────────────────────────────
+# STEP 10 — Start container
+# ─────────────────────────────────────────
+echo "🚀 Starting Creatio instance: ${INSTANCE}..."
 cd ${DEPLOY_DIR}
-docker compose down -v 2>/dev/null || true
+docker compose down 2>/dev/null || true
 docker compose up -d --build
 
 echo ""
-echo "✅ Deploy complete!"
-echo "   Creatio : http://localhost:${CREATIO_PORT}"
-echo "   pgAdmin : http://localhost:${PGADMIN_PORT}"
+echo "╔══════════════════════════════════════════════════╗"
+echo "║           ✅ DEPLOY COMPLETE                     ║"
+echo "╠══════════════════════════════════════════════════╣"
+echo "║  Instance : ${INSTANCE}"
+echo "║  Creatio  : http://localhost:${CREATIO_PORT}"
+echo "║  pgAdmin  : http://localhost:${PGADMIN_PORT}"
+echo "║  DB       : ${POSTGRES_DB}"
+echo "║  Redis DB : ${REDIS_DB}"
+echo "╚══════════════════════════════════════════════════╝"
