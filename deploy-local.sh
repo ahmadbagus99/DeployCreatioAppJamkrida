@@ -142,7 +142,7 @@ if [ ! -f "$ENV_FILE" ]; then
   echo "║     nano ${ENV_FILE}"
   echo "║                                                  ║"
   echo "║  2. Re-run deploy:                               ║"
-  echo "║     ./deploy-mac.sh ${INSTANCE}"
+  echo "║     ./deploy-local.sh ${INSTANCE}"
   echo "╚══════════════════════════════════════════════════╝"
   echo ""
   exit 0
